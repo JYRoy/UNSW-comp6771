@@ -9,7 +9,7 @@ This repo is in both English and Chinese. I will use English as the main languag
 2. Week2: STL
 
 ## Tutorials
-
+1. Week2: Catch2, STL
 
 ## References
 1. [C++ Core Guideline](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#main)
