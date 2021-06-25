@@ -6,6 +6,7 @@ This repo is in both English and Chinese. I will use English as the main languag
 ## Lectures
 
 1. Week1: C++ Basic
+2. Week2: STL
 
 ## Tutorials
 
