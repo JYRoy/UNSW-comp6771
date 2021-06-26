@@ -11,6 +11,7 @@ This repo is in both English and Chinese. I will use English as the main languag
 
 ## Tutorials
 1. Week2: Catch2, STL
+2. Week3: lambda function, ios(istream, ostream, etc), class
 
 ## References
 1. [C++ Core Guideline](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#main)
