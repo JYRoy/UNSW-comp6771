@@ -25,11 +25,13 @@ Implement it in `tests/lambda_string.cpp`
 TEST_CASE("Checks sort3(int&, int&, int&)") {
   std::vector<std::string> vec{"We", "love", "lambda", "functions"};
 
-  std::sort(vec.begin(), vec.end(), [] (std::string const& x, std::string const& y) {
-    auto const xcount = std::count_if(x.cbegin(), x.cend(), [] (char const& c) { return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'; });
-    auto const ycount = std::count_if(y.cbegin(), y.cend(), [] (char const& c) { return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'; });
+  auto const vowels = [] (char const& c) { return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'; };
+
+  std::sort(vec.begin(), vec.end(), [vowels] (std::string const& x, std::string const& y) {
+    auto const xcount = std::count_if(x.cbegin(), x.cend(), vowels);
+    auto const ycount = std::count_if(y.cbegin(), y.cend(), vowels);
     if (xcount == ycount) {
-      return x.length() > y.length();
+      return (x.length() - static_cast<std::string::size_type>xcount) > (y.length() -  static_cast<std::string::size_type>ycount);
     }
     return xcount > ycount;
   });
@@ -38,6 +40,11 @@ TEST_CASE("Checks sort3(int&, int&, int&)") {
   CHECK(correct_order == vec);
 }
 ```
+
+**注意**:
+这个题目里有个值得关注的点就是```static_cast<std::string::size_type>```。
+我们知道count_if的返回值类型是signed integral type。string::length()的返回值类型是unsigned integral type。如果我们不进行类型转换就会报如下错误：error: implicit conversion changes signedness: 'const long' to 'unsigned long'。也就是说需要进行显式的类型转换。使用static_cast<std:size_t>或者static_cast<std::string::size_type>。[std::string::size_type实际上就是std:size_t](https://www.cplusplus.com/reference/string/string/#types)。
+
 
 ## Question 2
 
@@ -196,6 +203,17 @@ car(std::string manufacturer, int num): manufacturer_(manufacturer), num_seats_(
     num_seats = num;
 }
 ```
+
+1. member initializer list: member initializer list, whose syntax is the colon character :, followed by the comma-separated list of one or more member-initializers
+2. [uniform initialisation](https://subscription.packtpub.com/book/programming/9781786465184/1/ch01lvl1sec7/understanding-uniform-initialization)
+3. Why is it important to use a member initializer list?
+    Member initializer list is the place where non-default initialization of these objects can be specified. For bases and non-static data members that cannot be default-initialized, such as members of reference and const-qualified types, member initializers must be specified.
+4. Why is uniform initialisation preferred since C++11?
+   [Understanding Uniform Initialization](https://subscription.packtpub.com/book/programming/9781786465184/1/ch01lvl1sec7/understanding-uniform-initialization)
+
+#### Reference
+1. [Constructor](https://en.cppreference.com/w/cpp/language/constructor)
+2. [uniform initialisation](https://subscription.packtpub.com/book/programming/9781786465184/1/ch01lvl1sec7/understanding-uniform-initialization)
 
 ### Question 4.2
 
