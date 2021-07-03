@@ -88,9 +88,9 @@ Disadvantages:
 - Lack of context on operations
 
 ## Friends
-A class may declare friend functions or classes. Those functions / classes are non-member functions that may access private parts of the class.  In general we prefer to define friends directly in the class they relate to.
+A class may declare friend functions or classes. Those functions / classes are non-member functions that may access private parts of the class(From cppreference.com: The friend declaration appears in a class body and grants a function or another class access to private and protected members of the class where the friend declaration appears.).  
 
-This is, in general, a bad idea, but there are a few cases where it may be required
+In general we prefer to define friends directly in the class they relate to. This is, in general, a bad idea, but there are a few cases where it may be required
 - Nonmember operator overloads (will be discussing soon)
 - Related classes
     - A Window class might have WindowManager as a friend
@@ -101,6 +101,17 @@ This is, in general, a bad idea, but there are a few cases where it may be requi
 Use friends when:
 - The data should not be available to everyone
 - There is a piece of code very related to this particular class
+
+Friends翻译过来叫友元，根据上面的内容，我们可以知道主要有两种友元，友元类和友元函数：
+- 友元函数：访问包含它的类中的private或者protected members
+- 友元类：友元类的成员函数可以访问包含它的类中的private或者protected members
+
+缺点：破坏了类的封装性和数据的透明性。
+
+其他：
+- 友元函数和友元类的声明通常要在类内，而定义通常要在类外
+- 友元没有继承性（不能访问子类）
+- 友元没有传递性（没有A->B，B->C, A->C这样的关系）
 
 ## Operator Overload Design
 |Type|Operator(s)|Member / friend|
@@ -114,8 +125,8 @@ Use friends when:
 |Increment/Decrement|++, --|member(non-const)|
 |Arrow, Deference|->, *|member(const and non-const)|
 |Call|()|member|
-1. Use members when the operation is called in the context of a particular instance.
-2. Use friends when the operation is called without any particular instance. Even if they don't require access to private details.
+1. Use members when the operation is called in the context of a particular instance(A member operator will use itself and bring something else in).
+2. Use friends when the operation is called without any particular instance. Even if they don't require access to private details.(A friend operator will take in two different objects of that type and fo something with it)
 
 ## I/O
 Equivalent to .toString() method in Java
@@ -149,6 +160,8 @@ auto main() -> int {
 	std::cout << p << '\n';
 }
 ```
+
+[This page](https://docs.microsoft.com/en-us/cpp/standard-library/overloading-the-output-operator-for-your-own-classes?view=msvc-160) has an another example of IO.
 
 ## Compound assignment
 
@@ -282,6 +295,10 @@ point& point::operator=(point const& p) {
 	return *this;
 }
 ```
+- ```*this``` refers to the reference of object itself. It is compitable with the return type ```point&```.
+- ```this``` refers to the pointer of the object. If we want to return this, we need to change the return type to ```point*```
+
+Recommend to read [this page](https://stackoverflow.com/questions/18162522/what-does-return-this-mean-in-c) for the ```*this```.
 
 ## Subscript
 Usually only defined on indexable containers. Different operator for get/set. Asserts are the right approach here as preconditions:
@@ -311,16 +328,29 @@ private:
 };
 ```
 
+Some operator overloads will only have a non-const version. If you have something that can't mutate, it would just be const. 
+
+This subscript function is a member function, not a friend function. You can't have a const qualified friend function because const says that we can't modify this object and that doesn't make sense for global variables don't have a sense of state they don't really have an object.
+
 ## Increment/Decrement
+They are member function since they modify themself.
 - prefix: ++x, --x, returns lvalue reference
 - postfix: x++, x--, returns rvalue
-- Performance: prefix > postfix
+- Performance: prefix > postfix(But it should beses on the cases)
 - Different operator for get/set
 - Postfix operator takes in an int
   - This is not to be used
   - It is only for function matching
   - Don't name the variable
 
+The conditions should like this,
+```c++
+auto i = 3;
+int j = ++i;  // j.operator++()   j = 3
+int j = i++;  // j.operator++(int)  j = 4
+int& j = i++;  // reference j = 4 
+```
+The operator implementation like this,
 ```c++
 // RoadPosition.h:
 class RoadPosition {
@@ -365,7 +395,7 @@ auto main() -> int {
 ```
 
 ## Arrow & Dereferencing
-This content will feature heavily in week 5.
+This content will feature heavily in week 5 (smart pointer).
 Classes exhibit pointer-like behaviour when -> is overloaded. For -> to work it must return a pointer to a class type or an object of a class type that defines its own -> operator.
 ```c++
 #include <iostream>
@@ -374,7 +404,7 @@ public:
 	explicit stringptr(std::string const& s)
 	: ptr_{new std::string(s)} {}
 	~stringptr() {
-		delete ptr_;
+		delete ptr_;  // freeing memory
 	}
 	std::string* operator->() const {
 		return ptr_;
@@ -391,8 +421,18 @@ auto main() -> int {
 	auto p = stringptr("smart pointer");
 	std::cout << *p << '\n';
 	std::cout << p->size() << '\n';
+
+	// mallocing a memory and free the memory
+	std::string *s = new std::string{"crap pointer"};
+	std::cout << *s;  // print the value
+	std::cout << s->size();  //print the size 
+	delete s;
 }
 ```
+The builtin operator-> on pointers ptr->size() is just syntax sugar for (*ptr).size . Also remember that user-definedoperator-> recurses until it hits something that is a raw pointer.
+
+That is, stringptr::operator-> returns a std::string*, and then this recurses to be (*the_string).size().
+
 
 ## Type Conversion
 Many other operator overloads
@@ -406,12 +446,17 @@ public:
 	point(int x, int y)
 	: x_(x)
 	, y_(y) {}
+	// This is an operator to convert my type to a standard vector.
 	explicit operator std::vector<int>() {
 		std::vector<int> vec;
 		vec.push_back(x_);
 		vec.push_back(y_);
 		return vec;
 	}
+	// This will convert to double.
+	// explicit operator double() const {
+	// 	...
+	// }
 
 private:
 	int x_;
@@ -431,34 +476,8 @@ int main() {
 
 ## New Function Syntax
 We are able to use the new function syntax on our operator overloads as well.
-```c++
-#include <iostream>
-class stringptr {
-public:
-	explicit stringptr(std::string const& s)
-	: ptr_{new std::string(s)} {}
-	~stringptr() {
-		delete ptr_;
-	}
-	auto operator->() const -> std::string* {
-		return ptr_;
-	}
-	auto operator*() const -> std::string& {
-		return *ptr_;
-	}
 
-private:
-	std::string* ptr_;
-};
-
-auto main() -> int {
-	auto p = stringptr("smart pointer");
-	std::cout << *p << '\n';
-	std::cout << p->size() << '\n';
-}
-```
-
-## Spaceship Operator
+### Spaceship Operator
 [Simplify Your Code With Rocket Science: C++20’s Spaceship Operator](https://devblogs.microsoft.com/cppblog/simplify-your-code-with-rocket-science-c20s-spaceship-operator/)
 
 ```c++
