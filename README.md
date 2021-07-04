@@ -9,6 +9,7 @@ This repo is in both English and Chinese. I will use English as the main languag
 2. Week2: STL
 3. Week3: Class
 4. Week4：Operator Overloading, Exceptions
+5. Week5: Resource Management
 
 ## Tutorials
 1. Week2: Catch2, STL
