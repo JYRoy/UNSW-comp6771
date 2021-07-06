@@ -75,11 +75,13 @@ Usually two ways of approaching problems:
 
 The ownership of resource is that an owner of a resource is the one who's responsible for correct cleanup of that resource.
 - Take ownership: 
+- Shared ownership:
 
 ## Unique pointer
 std::unique_pointer<T>
 - The unique pointer owns the object
-- When the unique pointer is destructed, the underlying object is too
+- When the unique pointer is destructed, the underlying object is too without new and delete
+- Two unique_pointer can't point to the same object.
 
 raw pointer (observer)
 - Unique Ptr may have many observers
@@ -101,5 +103,57 @@ int main() {
   std::cout << up4.get() << "\n";
   std::cout << *up4 << "\n";
   std::cout << *up1 << "\n";
+}
+```
+The unique pointer doesn't have copy constructor and copy assignment. The release method doesn't destroy the object, just release it and another pointer could point it. It will return a pointer to the managed object.
+
+Another example:
+op1 and up1 point to the same resource. Get will not return a unique_pointer, it will return a raw pointer based on the object type.
+```c++
+#include <memory>
+#include <iostream>
+
+int main() {
+  auto up1 = std::unique_ptr<int>{new int{0}};
+  *up1 = 5;
+  std::cout << *up1 << "\n";
+  auto op1 = up1.get();
+  *op1 = 6;
+  std::cout << *op1 << "\n";
+  up1.reset();
+  // std::cout << *op1 << "\n";  //AddressSanitizer: heap-use-after-free on address
+}
+```
+The output is
+```shell
+5
+6
+```
+
+### Unique Ptr Operators
+This method avoids the need for "new". It has other benefits that we will explore.
+
+`std::make_unique`: provides the exact same behavior of constructing with a unique pointer. It delegates the them to a constructor of the type you passed in which it puts on the heap.
+```c++
+#include <iostream>
+#include <memory>
+
+auto main() -> int {
+	// 1 - Worst - you can accidentally own the resource multiple
+	// times, or easily forget to own it.
+	// auto* silly_string = new std::string{"Hi"};
+	// auto up1 = std::unique_ptr<std::string>(silly_string);
+	// auto up11 = std::unique_ptr<std::string>(silly_string);
+
+	// 2 - Not good - requires actual thinking about whether there's a leak.
+	auto up2 = std::unique_ptr<std::string>(new std::string("Hello"));
+
+	// 3 - Good - no thinking required.
+	auto up3 = std::make_unique<std::string>("Hello");
+
+	std::cout << *up2 << "\n";
+	std::cout << *up3 << "\n";
+	// std::cout << *(up3.get()) << "\n";
+	// std::cout << up3->size();
 }
 ```
