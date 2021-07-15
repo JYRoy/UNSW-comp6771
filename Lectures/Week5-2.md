@@ -77,6 +77,14 @@ The ownership of resource is that an owner of a resource is the one who's respon
 - Take ownership: 
 - Shared ownership:
 
+### Examples
+- Linked list
+- Doubly linked list
+- Tree
+- DAG (mutable and non-mutable)
+- Graph (mutable and non-mutable)
+- Twitter feed with multiple sections (eg. my posts, popular posts)
+
 ## Unique pointer
 std::unique_pointer<T>
 - The unique pointer owns the object
@@ -155,5 +163,222 @@ auto main() -> int {
 	std::cout << *up3 << "\n";
 	// std::cout << *(up3.get()) << "\n";
 	// std::cout << up3->size();
+}
+```
+
+## Shared pointers
+The difference between the shared pointer and the unique pointers is that multiple shared pointers share ownership of a heap resource. When one shared pointer goes out of the scope. They check if they're the only shard pointer pointing to that resource. If they are the last shared pointer which point to the heap resource, they will also release the heap resource.
+
+`std::shared_pointer<T>`:
+Several shared pointers share ownership of the object
+- A reference counted pointer
+- When a shared pointer is destructed, if it is the only shared pointer left pointing at the object, then the object is destroyed
+- May also have many observers
+  - Just because the pointer has shared ownership doesn't mean the observers should get ownership too - don't mindlessly copy it
+
+`std::weak_ptr<T>`:
+- Weak pointers are used with share pointers when:
+  - You don't want to add to the reference count
+  - You want to be able to check if the underlying data is still valid before using it.
+- Multiply weak pointers also could point to one heap resource. It looks like the raw pointer, but weak pointer have a function to check if the heap resouces valid or not.
+
+Shared pointer usage:
+- `use_count`: could get the number of shared pointers which point to the same heap resource.
+```c++
+#include <iostream>
+#include <memory>
+
+auto main() -> int {
+	auto x = std::make_shared<int>(5);
+	std::cout << "use count: " << x.use_count() << "\n";
+	std::cout << "value: " << *x << "\n";
+	x.reset(); // Memory still exists, due to y.
+	std::cout << "use count: " << y.use_count() << "\n";
+	std::cout << "value: " << *y << "\n";
+	y.reset(); // Deletes the memory, since
+	// no one else owns the memory
+	std::cout << "use count: " << x.use_count() << "\n";
+	std::cout << "value: " << *y << "\n";
+}
+```
+Another examples of shared pointer:
+```c++
+
+```
+
+Weak pointer usage:
+- `lock`: get a shared pointer from the weak pointer.
+```c++
+#include <iostream>
+#include <memory>
+
+auto main() -> int {
+	auto x = std::make_shared<int>(1);
+
+	auto wp = std::weak_ptr<int>(x); // x owns the memory
+
+	auto y = wp.lock();
+	if (y != nullptr) { // x and y own the memory
+		// Do something with y
+		std::cout << "Attempt 1: " << *y << '\n';
+	}
+}
+```
+
+## When to use which type?
+Unique pointer vs shared pointer
+- You almost always want a unique pointer over a shared pointer
+-  Use a shared pointer if either:
+  - An object has multiple owners, and you don't know which one will stay around the longest
+  - You need temporary ownership (outside scope of this course)
+  - This is very rare
+
+
+## Leak freedom in Cpp
+![Leak Freedom](../Images/week5_2_leakfreedom.png)
+
+This image come from [this video](https://www.youtube.com/watch?v=JfmTagWcqoE).
+
+这张图可以总结为三种防止内存泄漏的策略：
+1. 使用局部变量和成员对象来限制生命周期。这样会在栈上分配内存，到了声明周期会自动销毁，是最安全的，它们的生命周期都在一定范围内。
+2. 如果一个对象必须拥有自己的生命周期（堆），且这个对象的拥有权不会改变，那么优先使用unique_ptr或容器。它们的效率和直接使用 new/delete 或 malloc/free 一样。
+3. 其他情况下，使用 shared_ptr。它的效率和手工进行引用计数的效率一样。
+
+## Stack unwinding
+Stack unwinding is the process of exiting the stack frames until we find an exception handler for the function.
+This calls any destructors on the way out
+- **Any resources not managed by destructors won't get freed up**
+- If an exception is thrown during stack unwinding, std::terminate is called
+
+在栈展开的过程中，如果被释放的局部变量中有指针，而该指针在此前已经用new运算申请了空间，就有可能导致内存泄露。因为栈展开的时候并不会自动对指针变量执行delete（或delete[]）操作。
+
+First case:
+Throws is a kind of stack unwinds and pops stack frames off. So the delete pointer line will never execute. It's not safe.
+```c++
+void g() {
+  throw std::runtime_error{""};
+}
+
+int main() {
+  auto ptr = new int{5};
+  g();
+  // Never executed.
+  delete ptr;
+}
+```
+
+Second case:
+It's not safe. Because the ptr is a raw pointer when the exception is thrown.
+```c++
+void g() {
+  throw std::runtime_error{""};
+}
+
+int main() {
+  auto ptr = new int{5};
+  g();
+  auto uni = std::unique_ptr<int>(ptr);
+}
+```
+
+Third case:
+It's safe since the features of the unqiue pointer which will destroy the object and free the heap resource when the main function is end.
+```c++
+void g() {
+  throw std::runtime_error{""};
+}
+
+int main() {
+  auto ptr = std::make_unique<int>(5);
+  g();
+}
+```
+
+## Exceptions & Destructors
+- During stack unwinding, std::terminate() will be called if an exception leaves a destructor
+- The resources may not be released properly if an exception leaves a destructor
+- All exceptions that occur inside a destructor should be handled inside the destructor
+- Destructors usually don't throw, and need to explicitly opt in to throwing
+  - STL types don't do that
+
+## Partial construction
+### Problem
+What happens if an exception is thrown halfway through a constructor?
+- The C++ standard: "An object that is partially constructed or partially destroyed will have destructors executed for all of its fully constructed subobjects"
+- A destructor is not called for an object that was partially constructed
+- Except for an exception thrown in a constructor that delegates (why?)
+```c++
+#include <exception>
+
+class my_int {
+public:
+   my_int(int const i) : i_{i} {
+      if (i == 2) {
+         throw std::exception();
+      }
+   }
+private:
+   int i_;
+};
+
+class unsafe_class {
+public:
+   unsafe_class(int a, int b)
+   : a_{new my_int{a}}
+   , b_{new my_int{b}}
+   {}
+
+  ~unsafe_class() {
+    delete a_;
+    delete b_;
+  }
+private:
+   my_int* a_;
+   my_int* b_;
+};
+
+int main() {
+  auto a = unsafe_class(1, 2);
+}
+```
+In this example, the my_int{a} and my_int{b} are not fully constructed.
+
+### Solution
+- Option 1: Try / catch in the constructor
+  - Very messy, but works (if you get it right...)
+  - Doesn't work with initialiser lists (needs to be in the body)
+- Option 2: An object managing a resource should initialise the resource last
+  - The resource is only initialised when the whole object is
+  - Consequence: An object can only manage one resource
+  - If you want to manage multiple resources, instead manage several wrappers , which each manage one resource.
+```c++
+#include <exception>
+#include <memory>
+
+class my_int {
+public:
+   my_int(int const i)
+   : i_{i} {
+      if (i == 2) {
+         throw std::exception();
+      }
+   }
+private:
+   int i_;
+};
+
+class safe_class {
+public:
+   safe_class(int a, int b)
+   : a_(std::make_unique<my_int>(a))
+   , b_(std::make_unique<my_int>(b))
+   {}
+private:
+   std::unique_ptr<my_int> a_;
+   std::unique_ptr<my_int> b_;
+};
+
+int main() {
+  auto a = safe_class(1, 2);
 }
 ```
